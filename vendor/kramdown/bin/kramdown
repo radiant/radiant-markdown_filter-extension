@@ -34,8 +34,8 @@ OptionParser.new do |opts|
   opts.separator "Command line options:"
   opts.separator ""
 
-  opts.on("-i", "--input ARG", "Specify the input format: kramdown (default)") {|v| options[:input] = v}
-  opts.on("-o", "--ouput ARG", "Specify the output format: html (default) or latex") {|v| format = v}
+  opts.on("-i", "--input ARG", "Specify the input format: kramdown (default) or html") {|v| options[:input] = v}
+  opts.on("-o", "--ouput ARG", "Specify the output format: html (default), kramdown or latex") {|v| format = v}
 
   opts.on("-v", "--version", "Show the version of kramdown") do
     puts Kramdown::VERSION
@@ -51,13 +51,14 @@ OptionParser.new do |opts|
   opts.separator ""
 
   Kramdown::Options.definitions.each do |n, definition|
+    no = n.to_s.tr('_', '-')
     if definition.type == Kramdown::Options::Boolean
-      opts.on("--[no-]#{n}") {|v| options[n] = Kramdown::Options.parse(n, v)}
+      opts.on("--[no-]#{no}") {|v| options[n] = Kramdown::Options.parse(n, v)}
     else
       next if definition.type == Object
       type = definition.type
       type = String if type == Symbol
-      opts.on("--#{n} ARG", type) {|v| options[n] = Kramdown::Options.parse(n, v)}
+      opts.on("--#{no} ARG", type) {|v| options[n] = Kramdown::Options.parse(n, v)}
     end
 
     definition.desc.split(/\n/).each do |line|

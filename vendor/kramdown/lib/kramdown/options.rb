@@ -212,21 +212,6 @@ Default: 1
 Used by: HTML converter
 EOF
 
-    define(:filter_html, Array, [], <<EOF)
-NOTE: This option is deprecated and will be removed in a future release!
-
-An array of HTML tags that should be filtered from the output
-
-The value can either be specified as array or as a space separated
-string (which will be converted to an array). All HTML tags that are
-listed in the array will be filtered from the output, i.e. only their
-contents is used. This applies only to HTML tags found in the initial
-document.
-
-Default: []
-Used by: HTML converter
-EOF
-
     define(:coderay_wrap, Symbol, :div, <<EOF)
 Defines how the highlighted code should be wrapped
 
@@ -275,6 +260,35 @@ styles are directly applied to the code elements).
 
 Default: style
 Used by: HTML converter
+EOF
+
+    define(:entity_output, Symbol, :as_char, <<EOF)
+Defines how entities are output
+
+The possible values are :as_input (entities are output in the same
+form as found in the input), :numeric (entities are output in numeric
+form), :symbolic (entities are output in symbolic form if possible) or
+:as_char (entities are output as characters if possible, only available
+on Ruby 1.9).
+
+Default: :as_char
+Used by: HTML converter, kramdown converter
+EOF
+
+    define(:toc_depth, Integer, 0, <<EOF)
+Defines the maximum level of headers which will be used to generate the table of
+contents. For instance, with a value of 2, toc entries will be generated for h1
+and h2 headers but not for h3, h4, etc. A value of 0 uses all header levels.
+
+Default: 0
+Used by: HTML/Latex converter
+EOF
+
+    define(:line_width, Integer, 72, <<EOF)
+Defines the line width to be used when outputting a document
+
+Default: 72
+Used by: kramdown converter
 EOF
 
   end

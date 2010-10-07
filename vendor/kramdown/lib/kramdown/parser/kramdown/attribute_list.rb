@@ -43,17 +43,22 @@ module Kramdown
       # Update the +ial+ with the information from the inline attribute list +opts+.
       def update_ial_with_ial(ial, opts)
         (ial[:refs] ||= []) << opts[:refs]
-        ial['class'] = ((ial['class'] || '') + " #{opts['class']}").lstrip if opts['class']
-        opts.each {|k,v| ial[k] = v if k != :refs && k != 'class' }
+        opts.each do |k,v|
+          if k == 'class'
+            ial[k] = ((ial[k] || '') + " #{v}").lstrip
+          elsif k.kind_of?(String)
+            ial[k] = v
+          end
+        end
       end
 
 
-      ALD_ID_CHARS = /[\w\d-]/
+      ALD_ID_CHARS = /[\w-]/
       ALD_ANY_CHARS = /\\\}|[^\}]/
-      ALD_ID_NAME = /(?:\w|\d)#{ALD_ID_CHARS}*/
+      ALD_ID_NAME = /\w#{ALD_ID_CHARS}*/
       ALD_TYPE_KEY_VALUE_PAIR = /(#{ALD_ID_NAME})=("|')((?:\\\}|\\\2|[^\}\2])*?)\2/
       ALD_TYPE_CLASS_NAME = /\.(#{ALD_ID_NAME})/
-      ALD_TYPE_ID_NAME = /#(#{ALD_ID_NAME})/
+      ALD_TYPE_ID_NAME = /#(\w[\w:-]*)/
       ALD_TYPE_REF = /(#{ALD_ID_NAME})/
       ALD_TYPE_ANY = /(?:\A|\s)(?:#{ALD_TYPE_KEY_VALUE_PAIR}|#{ALD_TYPE_ID_NAME}|#{ALD_TYPE_CLASS_NAME}|#{ALD_TYPE_REF})(?=\s|\Z)/
       ALD_START = /^#{OPT_SPACE}\{:(#{ALD_ID_NAME}):(#{ALD_ANY_CHARS}+)\}\s*?\n/
@@ -61,21 +66,24 @@ module Kramdown
       # Parse the attribute list definition at the current location.
       def parse_ald
         @src.pos += @src.matched_size
-        parse_attribute_list(@src[2], @doc.parse_infos[:ald][@src[1]] ||= {})
+        parse_attribute_list(@src[2], @doc.parse_infos[:ald][@src[1]] ||= Utils::OrderedHash.new)
+        @tree.children << Element.new(:eob, :ald)
         true
       end
       define_parser(:ald, ALD_START)
 
 
-      IAL_BLOCK_START = /^#{OPT_SPACE}\{:(?!:)(#{ALD_ANY_CHARS}+)\}\s*?\n/
+      IAL_BLOCK = /\{:(?!:|\/)(#{ALD_ANY_CHARS}+)\}\s*?\n/
+      IAL_BLOCK_START = /^#{OPT_SPACE}#{IAL_BLOCK}/
 
       # Parse the inline attribute list at the current location.
       def parse_block_ial
         @src.pos += @src.matched_size
         if @tree.children.last && @tree.children.last.type != :blank && @tree.children.last.type != :eob
-          parse_attribute_list(@src[1], @tree.children.last.options[:ial] ||= {})
+          parse_attribute_list(@src[1], @tree.children.last.options[:ial] ||= Utils::OrderedHash.new)
+          @tree.children << Element.new(:eob, :ial) unless @src.check(IAL_BLOCK_START)
         else
-          parse_attribute_list(@src[1], @block_ial = {})
+          parse_attribute_list(@src[1], @block_ial = Utils::OrderedHash.new)
         end
         true
       end
@@ -88,10 +96,10 @@ module Kramdown
       def parse_span_ial
         @src.pos += @src.matched_size
         if @tree.children.last && @tree.children.last.type != :text
-          attr = {}
+          attr = Utils::OrderedHash.new
           parse_attribute_list(@src[1], attr)
-          update_ial_with_ial(@tree.children.last.options[:ial] ||= {}, attr)
-          update_attr_with_ial(@tree.children.last.options[:attr] ||= {}, attr)
+          update_ial_with_ial(@tree.children.last.options[:ial] ||= Utils::OrderedHash.new, attr)
+          update_attr_with_ial(@tree.children.last.attr, attr)
         else
           warning("Ignoring span IAL because preceding element is just text")
         end

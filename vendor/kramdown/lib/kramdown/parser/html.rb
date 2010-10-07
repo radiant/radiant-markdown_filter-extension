@@ -39,11 +39,11 @@ module Kramdown
         HTML_INSTRUCTION_RE = /<\?(.*?)\?>/m
         HTML_ATTRIBUTE_RE = /\s*(#{REXML::Parsers::BaseParser::UNAME_STR})\s*=\s*(["'])(.*?)\2/m
         HTML_TAG_RE = /<((?>#{REXML::Parsers::BaseParser::UNAME_STR}))\s*((?>\s+#{REXML::Parsers::BaseParser::UNAME_STR}\s*=\s*(["']).*?\3)*)\s*(\/)?>/m
-        HTML_TAG_CLOSE_RE = /<\/(#{REXML::Parsers::BaseParser::NAME_STR})\s*>/m
-        HTML_ENTITY_RE = /&([\w:][\-\w\d\.:]*);|&#(\d+);|&\#x([0-9a-fA-F]+);/
+        HTML_TAG_CLOSE_RE = /<\/(#{REXML::Parsers::BaseParser::UNAME_STR})\s*>/m
+        HTML_ENTITY_RE = /&([\w:][\-\w\.:]*);|&#(\d+);|&\#x([0-9a-fA-F]+);/
 
 
-        HTML_PARSE_AS_BLOCK = %w{applet button blockquote colgroup dd div dl fieldset form iframe li
+        HTML_PARSE_AS_BLOCK = %w{applet button blockquote body colgroup dd div dl fieldset form iframe li
                                map noscript object ol table tbody thead tfoot tr td ul}
         HTML_PARSE_AS_SPAN  = %w{a abbr acronym address b bdo big cite caption del dfn dt em
                                h1 h2 h3 h4 h5 h6 i ins kbd label legend optgroup p q rb rbc
@@ -80,10 +80,10 @@ module Kramdown
         def handle_html_start_tag
           name = @src[1]
           closed = !@src[4].nil?
-          attrs = {}
+          attrs = Utils::OrderedHash.new
           @src[2].scan(HTML_ATTRIBUTE_RE).each {|attr,sep,val| attrs[attr] = val}
 
-          el = Element.new(:html_element, name, :attr => attrs, :category => :block)
+          el = Element.new(:html_element, name, attrs, :category => :block)
           @tree.children << el
 
           if !closed && HTML_ELEMENTS_WITHOUT_BODY.include?(el.value)
@@ -129,9 +129,9 @@ module Kramdown
             if result = @src.scan_until(HTML_RAW_START)
               add_text(result, @tree, :text)
               if result = @src.scan(HTML_COMMENT_RE)
-                @tree.children << Element.new(:xml_comment, result, :category => :block, :parent_is_raw => true)
+                @tree.children << Element.new(:xml_comment, result, nil, :category => :block)
               elsif result = @src.scan(HTML_INSTRUCTION_RE)
-                @tree.children << Element.new(:xml_pi, result, :category => :block, :parent_is_raw => true)
+                @tree.children << Element.new(:xml_pi, result, nil, :category => :block)
               elsif @src.scan(HTML_TAG_RE)
                 handle_html_start_tag(&block)
               elsif @src.scan(HTML_TAG_CLOSE_RE)
@@ -161,16 +161,23 @@ module Kramdown
       class ElementConverter
 
         include Constants
+        include ::Kramdown::Utils::Entities
 
         REMOVE_TEXT_CHILDREN =  %w{html head hgroup ol ul dl table colgroup tbody thead tfoot tr select optgroup}
+        WRAP_TEXT_CHILDREN = %w{body section nav article aside header footer address div li dd blockquote figure
+                                figcaption fieldset form}
         REMOVE_WHITESPACE_CHILDREN = %w{body section nav article aside header footer address
                                         div li dd blockquote figure figcaption td th fieldset form}
         STRIP_WHITESPACE = %w{address article aside blockquote body caption dd div dl dt fieldset figcaption form footer
                               header h1 h2 h3 h4 h5 h6 legend li nav p section td th}
-        SIMPLE_ELEMENTS = %w{em strong blockquote hr br a img p thead tbody tfoot tr td th ul ol dl li dl dt dd}
+        SIMPLE_ELEMENTS = %w{em strong blockquote hr br img p thead tbody tfoot tr td th ul ol dl li dl dt dd}
+
+        def initialize(doc)
+          @doc = doc
+        end
 
         # Convert the element +el+ and its children.
-        def process(el, convert_simple = true, parent = nil)
+        def process(el, do_conversion = true, preserve_text = false, parent = nil)
           case el.type
           when :xml_comment, :xml_pi, :html_doctype
             ptype = if parent.nil?
@@ -194,25 +201,26 @@ module Kramdown
           remove_text_children(el) if REMOVE_TEXT_CHILDREN.include?(type)
 
           mname = "convert_#{el.value}"
-          if self.class.method_defined?(mname)
+          if do_conversion && self.class.method_defined?(mname)
             send(mname, el)
-          elsif convert_simple && SIMPLE_ELEMENTS.include?(type)
+          elsif do_conversion && SIMPLE_ELEMENTS.include?(type)
             set_basics(el, type.intern, HTML_SPAN_ELEMENTS.include?(type) ? :span : :block)
-            process_children(el, convert_simple)
+            process_children(el, do_conversion, preserve_text)
           else
-            process_html_element(el, convert_simple)
+            process_html_element(el, do_conversion, preserve_text)
           end
 
           strip_whitespace(el) if STRIP_WHITESPACE.include?(type)
           remove_whitespace_children(el) if REMOVE_WHITESPACE_CHILDREN.include?(type)
+          wrap_text_children(el) if WRAP_TEXT_CHILDREN.include?(type)
         end
 
-        def process_children(el, convert_simple = true)
+        def process_children(el, do_conversion = true, preserve_text = false)
           el.children.map! do |c|
             if c.type == :text
-              process_text(c.value)
+              process_text(c.value, preserve_text)
             else
-              process(c, convert_simple, el)
+              process(c, do_conversion, preserve_text, el)
               c
             end
           end.flatten!
@@ -234,7 +242,7 @@ module Kramdown
                         elsif %w{mdash ndash hellip laquo raquo}.include?(val)
                           Element.new(:typographic_sym, val.intern)
                         else
-                          Element.new(:entity, val)
+                          Element.new(:entity, entity(val), nil, :original => src.matched)
                         end
             else
               result << Element.new(:text, src.scan(/.*/m))
@@ -243,16 +251,34 @@ module Kramdown
           result
         end
 
-        def process_html_element(el, convert_simple = true)
+        def process_html_element(el, do_conversion = true, preserve_text = false)
           el.options = {:category => HTML_SPAN_ELEMENTS.include?(el.value) ? :span : :block,
-            :parse_type => HTML_PARSE_AS[el.value],
-            :attr => el.options[:attr]
+            :parse_type => HTML_PARSE_AS[el.value]
           }
-          process_children(el, convert_simple)
+          process_children(el, do_conversion, preserve_text)
         end
 
         def remove_text_children(el)
           el.children.delete_if {|c| c.type == :text}
+        end
+
+        def wrap_text_children(el)
+          tmp = []
+          last_is_p = false
+          el.children.each do |c|
+            if c.options[:category] != :block || c.type == :text
+              if !last_is_p
+                tmp << Element.new(:p, nil, nil, :transparent => true)
+                last_is_p = true
+              end
+              tmp.last.children << c
+              tmp
+            else
+              tmp << c
+              last_is_p = false
+            end
+          end
+          el.children = tmp
         end
 
         def strip_whitespace(el)
@@ -277,7 +303,7 @@ module Kramdown
 
         def set_basics(el, type, category, opts = {})
           el.type = type
-          el.options = {:category => category, :attr => el.options[:attr]}.merge(opts)
+          el.options = {:category => category}.merge(opts)
           el.value = nil
         end
 
@@ -286,26 +312,68 @@ module Kramdown
           el.children.each {|c| extract_text(c, raw)}
         end
 
+        def convert_a(el)
+          if el.attr['href']
+            set_basics(el, :a, :span)
+            process_children(el)
+          else
+            process_html_element(el, false)
+          end
+        end
+
+        def convert_b(el)
+          set_basics(el, :strong, :span)
+          process_children(el)
+        end
+
+        def convert_i(el)
+          set_basics(el, :em, :span)
+          process_children(el)
+        end
+
         def convert_h1(el)
           set_basics(el, :header, :block, :level => el.value[1..1].to_i)
           extract_text(el, el.options[:raw_text] = '')
           process_children(el)
         end
-        %w{h2 h3 h4 h5 h6}.each {|i| alias_method("convert_#{i}".intern, :convert_h1)}
+        %w{h2 h3 h4 h5 h6}.each do |i|
+          alias_method("convert_#{i}".to_sym, :convert_h1)
+        end
 
         def convert_code(el)
-          if el.value == 'code'
-            set_basics(el, :codespan, :span)
-          else
-            set_basics(el, :codeblock, :block)
-          end
           raw = ''
           extract_text(el, raw)
           result = process_text(raw, true)
+          begin
+            str = result.inject('') do |mem, c|
+              if c.type == :text
+                mem << c.value
+              elsif c.type == :entity
+                if RUBY_VERSION >= '1.9'
+                  mem << c.value.char.encode(@doc.parse_infos[:encoding])
+                elsif [60, 62, 34, 38].include?(c.value.code_point)
+                  mem << c.value.code_point.chr
+                end
+              elsif c.type == :smart_quote || c.type == :typographic_sym
+                mem << entity(c.value.to_s).char.encode(@doc.parse_infos[:encoding])
+              else
+                raise "Bug - please report"
+              end
+            end
+            result.clear
+            result << Element.new(:text, str)
+          rescue
+          end
           if result.length > 1 || result.first.type != :text
-            el.children = result
+            process_html_element(el, false, true)
           else
+            if el.value == 'code'
+              set_basics(el, :codespan, :span)
+            else
+              set_basics(el, :codeblock, :block)
+            end
             el.value = result.first.value
+            el.children.clear
           end
         end
         alias :convert_pre :convert_code
@@ -318,16 +386,20 @@ module Kramdown
           process_children(el)
           set_basics(el, :table, :block)
           el.options[:alignment] = []
-          helper = lambda do |c|
+          calc_alignment = lambda do |c|
             if c.type == :tr && el.options[:alignment].empty?
               el.options[:alignment] = [:default] * c.children.length
               break
             else
-              c.children.each {|cc| helper.call(cc)}
+              c.children.each {|cc| calc_alignment.call(cc)}
             end
           end
-          helper.call(el)
-          true
+          calc_alignment.call(el)
+          if el.children.first.type == :tr
+            tbody = Element.new(:tbody, nil, nil, :category => :block)
+            tbody.children = el.children
+            el.children = [tbody]
+          end
         end
 
         def is_simple_table?(el)
@@ -336,17 +408,56 @@ module Kramdown
               (cc.type == :text || !HTML_BLOCK_ELEMENTS.include?(cc.value)) && only_phrasing_content.call(cc)
             end
           end
-          helper = Proc.new do |c|
+          check_cells = Proc.new do |c|
             if c.value == 'th' || c.value == 'td'
               return false if !only_phrasing_content.call(c)
             else
-              c.children.each {|cc| helper.call(cc)}
+              c.children.each {|cc| check_cells.call(cc)}
             end
           end
-          helper.call(el)
-          true
+          check_cells.call(el)
+
+          check_rows = lambda do |t, type|
+            t.children.all? {|r| (r.value == 'tr' || r.type == :text) && r.children.all? {|c| c.value == type || c.type == :text}}
+          end
+          check_rows.call(el, 'td') ||
+            (el.children.all? do |t|
+               t.type == :text || (t.value == 'thead' && check_rows.call(t, 'th')) ||
+                 ((t.value == 'tfoot' || t.value == 'tbody') && check_rows.call(t, 'td'))
+             end && el.children.any? {|t| t.value == 'tbody'})
         end
 
+        def convert_div(el)
+          if !is_math_tag?(el)
+            process_html_element(el)
+          else
+            handle_math_tag(el)
+          end
+        end
+        alias :convert_span :convert_div
+
+        def is_math_tag?(el)
+          el.attr['class'].to_s =~ /\bmath\b/ &&
+            el.children.size == 1 && el.children.first.type == :text
+        end
+
+        def handle_math_tag(el)
+          set_basics(el, :math, (el.value == 'div' ? :block : :span))
+          el.value = el.children.shift.value
+          if el.attr['class'] =~ /^\s*math\s*$/
+            el.attr.delete('class')
+          else
+            el.attr['class'].sub!(/\s?math/, '')
+          end
+          el.value.gsub!(/&(amp|quot|gt|lt);/) do |m|
+            case m
+            when '&amp;'   then '&'
+            when '&quot;'  then '"'
+            when '&gt;'    then '>'
+            when '&lt;'    then '<'
+            end
+          end
+        end
       end
 
       include Parser
@@ -359,11 +470,11 @@ module Kramdown
 
         while true
           if result = @src.scan(/\s*#{HTML_INSTRUCTION_RE}/)
-            @tree.children << Element.new(:xml_pi, result.strip, :category => :block)
+            @tree.children << Element.new(:xml_pi, result.strip, nil, :category => :block)
           elsif result = @src.scan(/\s*#{HTML_DOCTYPE_RE}/)
-            @tree.children << Element.new(:html_doctype, result.strip, :category => :block)
+            @tree.children << Element.new(:html_doctype, result.strip, nil, :category => :block)
           elsif result = @src.scan(/\s*#{HTML_COMMENT_RE}/)
-            @tree.children << Element.new(:xml_comment, result.strip, :category => :block)
+            @tree.children << Element.new(:xml_comment, result.strip, nil, :category => :block)
           else
             break
           end
@@ -374,7 +485,7 @@ module Kramdown
         end
         parse_raw_html(@tree, &tag_handler)
 
-        ec = ElementConverter.new
+        ec = ElementConverter.new(@doc)
         @tree.children.each {|c| ec.process(c)}
         ec.remove_whitespace_children(@tree)
         @tree
@@ -385,3 +496,4 @@ module Kramdown
   end
 
 end
+

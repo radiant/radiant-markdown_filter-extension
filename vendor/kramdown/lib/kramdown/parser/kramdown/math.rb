@@ -20,6 +20,8 @@
 #++
 #
 
+require 'kramdown/parser/kramdown/block_boundary'
+
 module Kramdown
   module Parser
     class Kramdown
@@ -28,13 +30,22 @@ module Kramdown
 
       # Parse the math block at the current location.
       def parse_block_math
-        if @src[1]
+        if !after_block_boundary?
+          return false
+        elsif @src[1]
           @src.scan(/^#{OPT_SPACE}\\/)
           return false
         end
+        orig_pos = @src.pos
         @src.pos += @src.matched_size
-        @tree.children << new_block_el(:math, @src[2], :category => :block)
-        true
+        data = @src[2]
+        if before_block_boundary?
+          @tree.children << new_block_el(:math, data)
+          true
+        else
+          @src.pos = orig_pos
+          false
+        end
       end
       define_parser(:block_math, BLOCK_MATH_START)
 
@@ -44,7 +55,7 @@ module Kramdown
       # Parse the inline math at the current location.
       def parse_inline_math
         @src.pos += @src.matched_size
-        @tree.children << Element.new(:math, @src[1], :category => :inline)
+        @tree.children << Element.new(:math, @src[1], nil, :category => :span)
       end
       define_parser(:inline_math, INLINE_MATH_START, '\$')
 

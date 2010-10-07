@@ -20,23 +20,24 @@
 #++
 #
 
+require 'kramdown/parser/kramdown/block_boundary'
+
 module Kramdown
   module Parser
     class Kramdown
 
-      HEADER_ID=/(?:[ \t]\{#((?:\w|\d)[\w\d-]*)\})?/
+      HEADER_ID=/(?:[ \t]\{#(\w[\w-]*)\})?/
       SETEXT_HEADER_START = /^(#{OPT_SPACE}[^ \t].*?)#{HEADER_ID}[ \t]*?\n(-|=)+\s*?\n/
 
       # Parse the Setext header at the current location.
       def parse_setext_header
-        if @tree.children.last && @tree.children.last.type != :blank
-          return false
-        end
+        return false if !after_block_boundary?
+
         @src.pos += @src.matched_size
         text, id, level = @src[1].strip, @src[2], @src[3]
-        el = new_block_el(:header, nil, :level => (level == '-' ? 2 : 1), :raw_text => text)
+        el = new_block_el(:header, nil, nil, :level => (level == '-' ? 2 : 1), :raw_text => text)
         add_text(text, el)
-        el.options[:attr] = {'id' => id} if id
+        el.attr['id'] = id if id
         @tree.children << el
         true
       end
@@ -48,14 +49,13 @@ module Kramdown
 
       # Parse the Atx header at the current location.
       def parse_atx_header
-        if @tree.children.last && @tree.children.last.type != :blank
-          return false
-        end
+        return false if !after_block_boundary?
+
         result = @src.scan(ATX_HEADER_MATCH)
         level, text, id = @src[1], @src[2].strip, @src[3]
-        el = new_block_el(:header, nil, :level => level.length, :raw_text => text)
+        el = new_block_el(:header, nil, nil, :level => level.length, :raw_text => text)
         add_text(text, el)
-        el.options[:attr] = {'id' => id} if id
+        el.attr['id'] = id if id
         @tree.children << el
         true
       end

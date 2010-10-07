@@ -168,15 +168,28 @@ module Kramdown
       # Update the tree by parsing all <tt>:raw_text</tt> elements with the span level parser
       # (resets +@tree+, +@src+ and the +@stack+) and by updating the attributes from the IALs.
       def update_tree(element)
+        last_blank = nil
         element.children.map! do |child|
           if child.type == :raw_text
+            last_blank = nil
             @stack, @tree, @text_type = [], nil, :text
             @src = StringScanner.new(child.value)
             parse_spans(child)
             child.children
+          elsif child.type == :eob
+            []
+          elsif child.type == :blank
+            if last_blank
+              last_blank.value += child.value
+              []
+            else
+              last_blank = child
+              child
+            end
           else
+            last_blank = nil
             update_tree(child)
-            update_attr_with_ial(child.options[:attr] ||= {}, child.options[:ial]) if child.options[:ial]
+            update_attr_with_ial(child.attr, child.options[:ial]) if child.options[:ial]
             child
           end
         end.flatten!
@@ -225,8 +238,13 @@ module Kramdown
         ial[:refs].each do |ref|
           update_attr_with_ial(attr, ref) if ref = @doc.parse_infos[:ald][ref]
         end if ial[:refs]
-        attr['class'] = ((attr['class'] || '') + " #{ial['class']}").lstrip if ial['class']
-        ial.each {|k,v| attr[k] = v if k.kind_of?(String) && k != 'class' }
+        ial.each do |k,v|
+          if k == 'class'
+            attr[k] = ((attr[k] || '') + " #{v}").lstrip
+          elsif k.kind_of?(String)
+            attr[k] = v
+          end
+        end
       end
 
       # Create a new block level element, taking care of applying a preceding block IAL if it exists.

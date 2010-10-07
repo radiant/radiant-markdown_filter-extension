@@ -25,18 +25,25 @@ module Kramdown
     class Kramdown
 
       if RUBY_VERSION == '1.8.5'
-        ACHARS = '\x80-\xFF'
+        ACHARS = '\w\x80-\xFF'
+      elsif RUBY_VERSION < '1.9.0'
+        ACHARS = '\w'
       else
-        ACHARS = ''
+        ACHARS = '[[:alnum:]]'
       end
-      AUTOLINK_START = /<((mailto|https?|ftps?):.+?|[-.\w#{ACHARS}]+@[-\w#{ACHARS}]+(\.[-\w#{ACHARS}]+)*\.[a-z]+)>/u
+      AUTOLINK_START_STR = "<((mailto|https?|ftps?):.+?|[-.#{ACHARS}]+@[-#{ACHARS}]+(\.[-#{ACHARS}]+)*\.[a-z]+)>"
+      if RUBY_VERSION < '1.9.0'
+        AUTOLINK_START = /#{AUTOLINK_START_STR}/u
+      else
+        AUTOLINK_START = /#{AUTOLINK_START_STR}/
+      end
 
       # Parse the autolink at the current location.
       def parse_autolink
         @src.pos += @src.matched_size
         href = @src[1]
         href= "mailto:#{href}" if @src[2].nil?
-        el = Element.new(:a, nil, {:attr => {'href' => href}})
+        el = Element.new(:a, nil, {'href' => href})
         add_text(@src[1].sub(/^mailto:/, ''), el)
         @tree.children << el
       end

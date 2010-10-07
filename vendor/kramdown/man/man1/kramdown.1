@@ -1,4 +1,4 @@
-.TH "KRAMDOWN" 1 "February 2010"
+.TH "KRAMDOWN" 1 "July 2010"
 .SH NAME
 kramdown \- a fast, pure-Ruby Markdown-superset converter
 .SH SYNOPSIS
@@ -6,9 +6,10 @@ kramdown \- a fast, pure-Ruby Markdown-superset converter
 [\fIoptions\fR]
 [\fIFILE\fR ...]
 .SH DESCRIPTION
-kramdown parses a superset of Markdown and converts it to different output formats. It is supports
-standard Markdown (with some minor modifications) and various extensions like tables and definition
-lists.
+kramdown is primarily used for parsing a superset of Markdown and converting it to different output
+formats. It supports standard Markdown (with some minor modifications) and various extensions like
+tables and definition lists. Due to its modular architecture it also allows other input formats than
+Markdown, for example, HTML.
 
 If \fIFILE\fR is not specified, kramdown reads from the standard input. The result is written to the
 standard output.
@@ -18,8 +19,11 @@ used directly by the kramdown binary. The second set of options controls how kra
 converts its input.
 .SH OPTIONS
 .TP
-.B \-f, \-\-format ARG
-Specify the output format. Available output formats: html (this is the default) or latex.
+.B \-i, \-\-input ARG
+Specify the input format. Available input formats: kramdown (this is the default) or html.
+.TP
+.B \-o, \-\-output ARG
+Specify the output format. Available output formats: html (this is the default), kramdown or latex.
 .TP
 .B \-v, \-\-version
 Show the version of kramdown.
@@ -53,7 +57,7 @@ Used by: all converters
 
 
 .TP
-.B \-\-[no\-]auto_ids
+.B \-\-[no\-]auto-ids
 
 Use automatic header ID generation
 
@@ -65,7 +69,7 @@ Used by: HTML/Latex converter
 
 
 .TP
-.B \-\-auto_id_prefix ARG
+.B \-\-auto-id-prefix ARG
 
 Prefix used for automatically generated heaer IDs
 
@@ -79,7 +83,7 @@ Used by: HTML/Latex converter
 
 
 .TP
-.B \-\-[no\-]parse_block_html
+.B \-\-[no\-]parse-block-html
 
 Process kramdown syntax in block HTML tags
 
@@ -93,7 +97,7 @@ Used by: kramdown parser
 
 
 .TP
-.B \-\-[no\-]parse_span_html
+.B \-\-[no\-]parse-span-html
 
 Process kramdown syntax in span HTML tags
 
@@ -105,7 +109,7 @@ Used by: kramdown parser
 
 
 .TP
-.B \-\-[no\-]html_to_native
+.B \-\-[no\-]html-to-native
 
 Convert HTML elements to native elements
 
@@ -122,7 +126,7 @@ Used by: kramdown parser
 
 
 .TP
-.B \-\-footnote_nr ARG
+.B \-\-footnote-nr ARG
 
 The number of the first footnote
 
@@ -134,24 +138,7 @@ Used by: HTML converter
 
 
 .TP
-.B \-\-filter_html ARG
-
-NOTE: This option is deprecated and will be removed in a future release!
-
-An array of HTML tags that should be filtered from the output
-
-The value can either be specified as array or as a space separated
-string (which will be converted to an array). All HTML tags that are
-listed in the array will be filtered from the output, i.e. only their
-contents is used. This applies only to HTML tags found in the initial
-document.
-
-Default: []
-Used by: HTML converter
-
-
-.TP
-.B \-\-coderay_wrap ARG
+.B \-\-coderay-wrap ARG
 
 Defines how the highlighted code should be wrapped
 
@@ -162,7 +149,7 @@ Used by: HTML converter
 
 
 .TP
-.B \-\-coderay_line_numbers ARG
+.B \-\-coderay-line-numbers ARG
 
 Defines how and if line numbers should be shown
 
@@ -174,7 +161,7 @@ Used by: HTML converter
 
 
 .TP
-.B \-\-coderay_line_number_start ARG
+.B \-\-coderay-line-number-start ARG
 
 The start value for the line numbers
 
@@ -183,7 +170,7 @@ Used by: HTML converter
 
 
 .TP
-.B \-\-coderay_tab_width ARG
+.B \-\-coderay-tab-width ARG
 
 The tab width used in highlighted code
 
@@ -191,7 +178,7 @@ Used by: HTML converter
 
 
 .TP
-.B \-\-coderay_bold_every ARG
+.B \-\-coderay-bold-every ARG
 
 Defines how often a line number should be made bold
 
@@ -200,7 +187,7 @@ Used by: HTML converter
 
 
 .TP
-.B \-\-coderay_css ARG
+.B \-\-coderay-css ARG
 
 Defines how the highlighted code gets styled
 
@@ -212,8 +199,45 @@ Default: style
 Used by: HTML converter
 
 
+.TP
+.B \-\-entity-output ARG
+
+Defines how entities are output
+
+The possible values are :as_input (entities are output in the same
+form as found in the input), :numeric (entities are output in numeric
+form), :symbolic (entities are output in symbolic form if possible) or
+:as_char (entities are output as characters if possible, only available
+on Ruby 1.9).
+
+Default: :as_char
+Used by: HTML converter, kramdown converter
+
+
+.TP
+.B \-\-toc-depth ARG
+
+Defines the maximum level of headers which will be used to generate the table of
+contents. For instance, with a value of 2, toc entries will be generated for h1
+and h2 headers but not for h3, h4, etc. A value of 0 uses all header levels.
+
+Default: 0
+Used by: HTML/Latex converter
+
+
+.TP
+.B \-\-line-width ARG
+
+Defines the line width to be used when outputting a document
+
+Default: 72
+Used by: kramdown converter
+
+
+.SH EXIT STATUS
+The exit status is 0 if no error happened. Otherwise it is 1.
 .SH SEE ALSO
-The kramdown website, http://kramdown.rubyforge.org/ for more information, especially on the support
+The kramdown website, http://kramdown.rubyforge.org/ for more information, especially on the supported
 input syntax.
 .SH AUTHOR
 kramdown was written by Thomas Leitner <t_leitner@gmx.at>.

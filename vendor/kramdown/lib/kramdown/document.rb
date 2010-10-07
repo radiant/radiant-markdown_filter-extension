@@ -27,6 +27,7 @@ require 'kramdown/error'
 require 'kramdown/parser'
 require 'kramdown/converter'
 require 'kramdown/options'
+require 'kramdown/utils'
 
 module Kramdown
 
@@ -92,6 +93,7 @@ module Kramdown
       @options = Options.merge(options)
       @warnings = []
       @parse_infos = {}
+      @parse_infos[:encoding] = source.encoding if RUBY_VERSION >= '1.9'
       @conversion_infos = {}
       parser = (options[:input] || 'kramdown').to_s
       parser = parser[0..0].upcase + parser[1..-1]
@@ -134,10 +136,12 @@ module Kramdown
     # Many elements don't use this field.
     attr_accessor :value
 
+    # The attributes of the element. Uses an Utils::OrderedHash to retain the insertion order.
+    attr_reader :attr
+
     # The options hash for the element. It is used for storing arbitray options as well as the
     # following special contents:
     #
-    # - *Attributes* of the element under the <tt>:attr</tt> key
     # - Category of the element, either <tt>:block</tt> or <tt>:span</tt>, under the
     #   <tt>:category</tt> key. If this key is absent, it can be assumed that the element is in the
     #   <tt>:span</tt> category.
@@ -147,15 +151,15 @@ module Kramdown
     attr_accessor :children
 
 
-    # Create a new Element object of type +type+. The optional parameters +value+ and +options+ can
-    # also be set in this constructor for convenience.
-    def initialize(type, value = nil, options = {})
-      @type, @value, @options = type, value, options
+    # Create a new Element object of type +type+. The optional parameters +value+, +attr+ and
+    # +options+ can also be set in this constructor for convenience.
+    def initialize(type, value = nil, attr = nil, options = {})
+      @type, @value, @attr, @options = type, value, Utils::OrderedHash.new(attr), options
       @children = []
     end
 
     def inspect #:nodoc:
-      "<kd:#{@type}#{@value.nil? ? '' : ' ' + @value.inspect}#{options.empty? ? '' : ' ' + @options.inspect}#{@children.empty? ? '' : ' ' + @children.inspect}>"
+      "<kd:#{@type}#{@value.nil? ? '' : ' ' + @value.inspect} #{@attr.inspect}#{options.empty? ? '' : ' ' + @options.inspect}#{@children.empty? ? '' : ' ' + @children.inspect}>"
     end
 
   end
