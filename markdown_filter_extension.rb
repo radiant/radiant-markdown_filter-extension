@@ -1,10 +1,4 @@
-begin
-  require 'rdiscount'
-rescue LoadError
-  # If RDiscount is not available, use packaged BlueCloth
-  $LOAD_PATH.unshift "#{File.dirname(__FILE__)}/vendor/kramdown/lib"
-  require 'kramdown'
-end
+require "bluecloth"
 
 class MarkdownFilterExtension < Radiant::Extension
   version "1.0"
