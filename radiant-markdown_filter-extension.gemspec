@@ -22,9 +22,4 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   s.add_dependency "bluecloth", "~> 2.1.0"
-
-  s.post_install_message = %{
-  Add this to your radiant project with:
-    config.gem "radiant-markdown_filter-extension", :version => "~> #{RadiantMarkdownFilterExtension::VERSION}"
-  }
 end
