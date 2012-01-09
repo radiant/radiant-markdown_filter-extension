@@ -21,5 +21,5 @@ Gem::Specification.new do |s|
   s.test_files    = Dir["test/**/*","spec/**/*","features/**/*"] - ignores
   s.require_paths = ["lib"]
 
-  s.add_dependency "bluecloth", "~> 2.1.0"
+  s.add_dependency "bluecloth", "~> 2.2.0"
 end
