@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
 $:.push File.expand_path("../lib", __FILE__)
-require "radiant-markdown_filter-extension/version"
+require "radiant-markdown_filter-extension"
 
 Gem::Specification.new do |s|
   s.name        = "radiant-markdown_filter-extension"
@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.email       = ["radiant@radiantcms.org"]
   s.homepage    = "http://radiantcms.org/"
   s.summary     = %q{Markdown Filter for Radiant CMS}
-  s.description = %q{Allows you to compose page parts or snippets using the Markdown text filter.}
+  s.description = RadiantMarkdownFilterExtension::DESCRIPTON
 
   ignores = if File.exist?(".gitignore")
     File.read(".gitignore").split("\n").inject([]) {|a,p| a + Dir[p] }

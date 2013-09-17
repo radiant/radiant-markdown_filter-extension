@@ -1,9 +1,10 @@
 require "bluecloth"
+require 'radiant-markdown_filter-extension'
 
 class MarkdownFilterExtension < Radiant::Extension
   version RadiantMarkdownFilterExtension::VERSION
-  description "Allows you to compose page parts or snippets using the Markdown text filter."
-  url "http://github.com/radiant/radiant-markdown_filter-extension/"
+  description RadiantMarkdownFilterExtension::DESCRIPTION
+  url RadiantMarkdownFilterExtension::URL
 
   def activate
     MarkdownFilter
