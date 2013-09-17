@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.email       = ["radiant@radiantcms.org"]
   s.homepage    = "http://radiantcms.org/"
   s.summary     = %q{Markdown Filter for Radiant CMS}
-  s.description = RadiantMarkdownFilterExtension::DESCRIPTON
+  s.description = RadiantMarkdownFilterExtension::DESCRIPTION
 
   ignores = if File.exist?(".gitignore")
     File.read(".gitignore").split("\n").inject([]) {|a,p| a + Dir[p] }
